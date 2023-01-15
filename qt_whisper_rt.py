@@ -37,11 +37,16 @@ class Ui(QtWidgets.QMainWindow):
         self.Whisper = whisper_rt.WhisperRT(self)
         
     def getTran(self,texts):
-        self._fromTranscription = texts
+        t = texts+' '
+        if self._fromTranscription in texts:
+            texts = texts[len(self._fromTranscription)-1:]
+            self._fromTranscription = t
+        self._fromTranscription = texts+' '
+        
+        pyautogui.write(texts, interval=0.002)
         # print()
     def _asyncUpdateGUI(self):
         self.plainTextEdit.setPlainText(self._transcription)
-        pyautogui.write(self._transcription, interval=0.25)
     def _monitorTranscription(self):
         while self._bButtonActive:
             if self._fromTranscription != self._transcription:

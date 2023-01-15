@@ -27,11 +27,11 @@ from multiprocessing import Pipe
 
 class WhisperRT:
     _parent = ''
-    _modelName = 'tiny.en'
+    _modelName = 'base.en'
     _nonEnglish = False
     _energyThreshold = 1000
     _recordTimeout = 2
-    _phraseTimeout = 3
+    _phraseTimeout = 0.5
     _defaultMicrophone = 'pulse'
     _tempFile = ''
     _ambientNoiseAdjustment = 2 # How many seconds to adjust for noise on start
@@ -132,11 +132,11 @@ class WhisperRT:
                     # If we detected a pause between recordings, add a new item to our transcripion.
                     # Otherwise edit the existing one.
                     # if phrase_complete:
-                    #     self.transcription.append(text)
+                    self._parent.getTran(text)
                     # else:
                     #     self.transcription[-1] = text
                         
-                    self._parent.getTran(text)
+                    
                     print(text)
            
                     # pipe.send(self.transcription)
