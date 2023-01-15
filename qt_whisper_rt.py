@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import pyqtSignal
 import sys
 import threading
+import pyautogui
 from multiprocessing import Pipe
 
 from time import sleep
@@ -40,6 +41,7 @@ class Ui(QtWidgets.QMainWindow):
         # print()
     def _asyncUpdateGUI(self):
         self.plainTextEdit.setPlainText(self._transcription)
+        pyautogui.write(self._transcription, interval=0.25)
     def _monitorTranscription(self):
         while self._bButtonActive:
             if self._fromTranscription != self._transcription:
