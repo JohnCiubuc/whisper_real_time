@@ -35,7 +35,7 @@ class Ui(QtWidgets.QMainWindow):
         
     def _initWhisper(self):
         self.Whisper = whisper_rt.WhisperRT(self)
-       
+      
     def doubleSpinBox_PTChanged(self,value):
         print(value)
         self.Whisper._phraseTimeout =   value

@@ -33,7 +33,7 @@ class WhisperRT:
     _modelName = 'base.en'
     _nonEnglish = False
     _energyThreshold = 1000
-    _recordTimeout = 1
+    _recordTimeout = 1 # Below 1 results in freezing issues
     _phraseTimeout = 1
     _defaultMicrophone = 'pulse'
     _tempFile = ''
@@ -110,15 +110,8 @@ class WhisperRT:
                 audio_data = sr.AudioData(self._lastSample, 
                                           self._Source.SAMPLE_RATE, 
                                           self._Source.SAMPLE_WIDTH)
-                wav_data = io.BytesIO(audio_data.get_wav_data())
-                
-                # Write wav data to the temporary file as bytes.
-                # Would love to avoid this step though
-                with open(self._tempFile, 'w+b') as f:
-                    f.write(wav_data.read())
-                    
-                # load audio (with shape (samples, channels))
-                data, rate = sf.read(self._tempFile) 
+               
+                data, rate =  sf.read(io.BytesIO(audio_data.get_wav_data()), dtype='float32') 
                 # create BS.1770 meter
                 meter = pyln.Meter(rate) 
                 # measure loudness
@@ -136,7 +129,6 @@ class WhisperRT:
     def _recordThread(self):
         bStartRecord =  False
         while self._activeRecording:
-            print('record thread')
             try:
                 # Pull raw recorded audio from the queue.
                 if not self._Queue.empty():
@@ -149,24 +141,20 @@ class WhisperRT:
                     audio_data = sr.AudioData(databytes, 
                                               self._Source.SAMPLE_RATE, 
                                               self._Source.SAMPLE_WIDTH)
-                    wav_data = io.BytesIO(audio_data.get_wav_data())
-           
-                    # Write wav data to the temporary file as bytes.
-                    with open(self._tempFile, 'w+b') as f:
-                        f.write(wav_data.read())
-           
-                    data, rate = sf.read(self._tempFile) # load audio (with shape (samples, channels))
+
+                    data, rate =  sf.read(io.BytesIO(audio_data.get_wav_data()), dtype='float32')  # load audio (with shape (samples, channels))
                     meter = pyln.Meter(rate) # create BS.1770 meter
                     loudness = meter.integrated_loudness(data) # measure loudness
                     print(loudness)
                     
                     # Check if current audio is louder than ambience:
-                    if loudness >= self._ambientNoiseAdjustment + 1:
+                    if loudness >= self._ambientNoiseAdjustment + 2:
                         bStartRecord = True
                         print('Actively Recording')
                         self._lastSample += databytes
                     # Previously recording, but now audio is back to ambience
-                    elif bStartRecord:
+                    elif loudness <= self._ambientNoiseAdjustment + 0.5 and bStartRecord:
+                        self._lastSample += databytes
                         bStartRecord = False
                         # Read the transcription.
                         # Use AudioData to convert the raw data to wav data.
