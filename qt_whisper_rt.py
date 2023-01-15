@@ -36,12 +36,19 @@ class Ui(QtWidgets.QMainWindow):
     def _initWhisper(self):
         self.Whisper = whisper_rt.WhisperRT(self)
         
-    def getTran(self,texts):
+    # Saves transcription. Called from WhisperRT
+    # writes transcription into text
+    # Saved transcription used in a GUI thread later
+    def getTranscription(self,texts):
         self._fromTranscription = texts+' '
         pyautogui.write(self._fromTranscription, interval=0.01)
-        # print()
+        
+    # Updates GUI with transcription from thread    
     def _asyncUpdateGUI(self):
         self.plainTextEdit.setPlainText(self._transcription)
+    
+    # Thread to detect if we have new transcription text that's different
+    # If so, update main thread with new text
     def _monitorTranscription(self):
         while self._bButtonActive:
             if self._fromTranscription != self._transcription:
@@ -49,6 +56,8 @@ class Ui(QtWidgets.QMainWindow):
                 self._transcription = self._fromTranscription
                 self.updateText.emit()
             sleep(0.2)
+        
+    # Start/Stop Transcription
     def buttonClicked(self):
         if not self.Whisper.ModelReady:
             return
@@ -57,14 +66,12 @@ class Ui(QtWidgets.QMainWindow):
             self.pushButton.setText('End Transcription')
             tr = threading.Thread(target=self._monitorTranscription)
             tr.start()
-            # self._monitorTranscription()
             self.Whisper.startRecording()
         else:
             self.pushButton.setText('Start Transcription')
             self.Whisper.stopRecording()
         
     def closeEvent(self, event):
-      # do stuff
       self.Whisper.stopRecording()
       event.accept()
       

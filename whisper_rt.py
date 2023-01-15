@@ -11,7 +11,6 @@ This is adapted from https://github.com/davabase/whisper_real_time
 
 
 import io
-import os
 import speech_recognition as sr
 import whisper
 import torch
@@ -56,10 +55,9 @@ class WhisperRT:
         # Adjust microphone to ambient noise
         with self._Source:
             self._Recorder.adjust_for_ambient_noise(self._Source, self._ambientNoiseAdjustment)
-            
-        
+
          # Cue the user that we're ready to go.
-        print("Model loaded. Listening in background\n")
+        print("\n\nModel loaded.\n\n")
         self.ModelReady = True
         
     def _setupRecognizer(self):
@@ -96,12 +94,10 @@ class WhisperRT:
                 now = datetime.utcnow()
                 # Pull raw recorded audio from the queue.
                 if not self._Queue.empty():
-                    phrase_complete = False
                     # If enough time has passed between recordings, consider the phrase complete.
                     # Clear the current working audio buffer to start over with the new data.
                     if self._phraseTime and now - self._phraseTime > timedelta(seconds=self._phraseTimeout):
                         self._lastSample = bytes()
-                        phrase_complete = True
                     # This is the last time we received new audio data from the queue.
                     self._phraseTime = now
            
@@ -124,27 +120,18 @@ class WhisperRT:
                     result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
                     text = result['text'].strip()
            
-                    # If we detected a pause between recordings, add a new item to our transcripion.
-                    # Otherwise edit the existing one.
-                    # if phrase_complete:
-                    self._parent.getTran(text)
-                    # else:
-                    #     self.transcription[-1] = text
-                        
-                    
+                    # Send to parent (if exists) current transcription
+                    try:
+                        self._parent.getTranscription(text)
+                    except:
+                        print("Unable to send parent transcription. "
+                              "Likely WhisperRT uninitilized with parent or "
+                              "Parent does not have a 'getTranscription' function.")
                     print(text)
-           
-                    # pipe.send(self.transcription)
-                    # Clear the console to reprint the updated transcription.
-                    # os.system('cls' if os.name=='nt' else 'clear')
-                    # for line in self.transcription:
-                    #     print(text)
-                    # Flush stdout.
-                    # print('', end='', flush=True)
                     sleep(0.1)
                     
             except :
-                print('Something Ugly Hasppened')
+                print('Main record thread failed. Something ugly happened')
                 break
                
         print("Recording thread terminated")
@@ -157,16 +144,12 @@ class WhisperRT:
                                             self._record_callback, 
                                             phrase_time_limit=self._recordTimeout)
         self.transcription = ['']
-        os.system('cls' if os.name=='nt' else 'clear')
         recordThread = threading.Thread(target=self._recordThread)
         recordThread.start()
 
     def stopRecording(self):
         self._stopListeningFunction(wait_for_stop=False)
         self._activeRecording = False
-    
-    def getTranscription(self):
-        return self.transcription 
    
 
    
