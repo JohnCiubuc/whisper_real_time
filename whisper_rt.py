@@ -16,17 +16,17 @@ import speech_recognition as sr
 import whisper
 import torch
 import threading
-from curtsies import Input
 
 from datetime import datetime, timedelta
 from queue import Queue
 from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
-
+from multiprocessing import Pipe
 
 
 class WhisperRT:
+    _parent = ''
     _modelName = 'tiny.en'
     _nonEnglish = False
     _energyThreshold = 1000
@@ -45,7 +45,10 @@ class WhisperRT:
     _Source = ''
     _Model = ''
     
-    def __init__(self):
+    ModelReady = False
+    
+    def __init__(self, parent):
+        self._parent = parent
         self._setupRecognizer()
         self._Model = whisper.load_model(self._modelName)
         self._tempFile = NamedTemporaryFile().name;
@@ -57,11 +60,11 @@ class WhisperRT:
         # Create a background thread that will pass us raw audio bytes.
         # We could do this manually but SpeechRecognizer provides a nice helper.
         self._Recorder.listen_in_background(self._Source, 
-                                            self.record_callback, 
+                                            self._record_callback, 
                                             phrase_time_limit=self._recordTimeout)
          # Cue the user that we're ready to go.
         print("Model loaded. Listening in background\n")
-            
+        self.ModelReady = True
         
     def _setupRecognizer(self):
         # Thread safe Queue for passing data from the threaded recording callback.
@@ -82,7 +85,7 @@ class WhisperRT:
         else:
             self._Source = sr.Microphone(sample_rate=16000)
             
-    def record_callback(self, _, audio:sr.AudioData) -> None:
+    def _record_callback(self, _, audio:sr.AudioData) -> None:
         """
         Threaded callback function to recieve audio data when recordings finish.
         audio: An AudioData containing the recorded bytes.
@@ -128,17 +131,21 @@ class WhisperRT:
            
                     # If we detected a pause between recordings, add a new item to our transcripion.
                     # Otherwise edit the existing one.
-                    if phrase_complete:
-                        self.transcription.append(text)
-                    else:
-                        self.transcription[-1] = text
+                    # if phrase_complete:
+                    #     self.transcription.append(text)
+                    # else:
+                    #     self.transcription[-1] = text
+                        
+                    self._parent.getTran(text)
+                    print(text)
            
+                    # pipe.send(self.transcription)
                     # Clear the console to reprint the updated transcription.
-                    os.system('cls' if os.name=='nt' else 'clear')
-                    for line in self.transcription:
-                        print(line)
+                    # os.system('cls' if os.name=='nt' else 'clear')
+                    # for line in self.transcription:
+                    #     print(text)
                     # Flush stdout.
-                    print('', end='', flush=True)
+                    # print('', end='', flush=True)
                     sleep(0.1)
                     
             except :
@@ -157,6 +164,8 @@ class WhisperRT:
     def stopRecording(self):
         self._activeRecording = False
     
+    def getTranscription(self):
+        return self.transcription 
    
 
    
