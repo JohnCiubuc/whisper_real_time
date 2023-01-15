@@ -29,7 +29,7 @@ class WhisperRT:
     _nonEnglish = False
     _energyThreshold = 1000
     _recordTimeout = None
-    _phraseTimeout = 0.5
+    _phraseTimeout = 1
     _defaultMicrophone = 'pulse'
     _tempFile = ''
     _ambientNoiseAdjustment = 2 # How many seconds to adjust for noise on start

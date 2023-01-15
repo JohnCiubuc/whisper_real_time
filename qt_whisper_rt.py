@@ -12,7 +12,6 @@ from PyQt5.QtCore import pyqtSignal
 import sys
 import threading
 import pyautogui
-from multiprocessing import Pipe
 
 from time import sleep
 import whisper_rt
@@ -29,19 +28,25 @@ class Ui(QtWidgets.QMainWindow):
         uic.loadUi('qt/interface.ui', self) # Load the .ui file
         
         self.pushButton.clicked.connect(self.buttonClicked)
+        self.doubleSpinBox_PT.valueChanged.connect(self.doubleSpinBox_PTChanged)
         tr = threading.Thread(target=self._initWhisper)
         tr.start()
         self.updateText.connect(self._asyncUpdateGUI)
         
     def _initWhisper(self):
         self.Whisper = whisper_rt.WhisperRT(self)
-        
+       
+    def doubleSpinBox_PTChanged(self,value):
+        print(value)
+        self.Whisper._phraseTimeout =   value
+              
     # Saves transcription. Called from WhisperRT
     # writes transcription into text
     # Saved transcription used in a GUI thread later
     def getTranscription(self,texts):
         self._fromTranscription = texts+' '
-        pyautogui.write(self._fromTranscription, interval=0.01)
+        if self.checkBox_SK.isChecked():
+            pyautogui.write(self._fromTranscription, interval=0.01)
         
     # Updates GUI with transcription from thread    
     def _asyncUpdateGUI(self):
