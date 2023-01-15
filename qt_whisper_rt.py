@@ -50,7 +50,7 @@ class Ui(QtWidgets.QMainWindow):
         
     # Updates GUI with transcription from thread    
     def _asyncUpdateGUI(self):
-        self.plainTextEdit.setPlainText(self._transcription)
+        self.plainTextEdit.setPlainText(self.plainTextEdit.toPlainText() + self._transcription)
     
     # Thread to detect if we have new transcription text that's different
     # If so, update main thread with new text

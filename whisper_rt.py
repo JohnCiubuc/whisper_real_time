@@ -15,6 +15,11 @@ import speech_recognition as sr
 import whisper
 import torch
 import threading
+import soundfile as sf
+import pyloudnorm as pyln
+import numpy as np
+
+import audioop
 
 from datetime import datetime, timedelta
 from queue import Queue
@@ -28,12 +33,13 @@ class WhisperRT:
     _modelName = 'base.en'
     _nonEnglish = False
     _energyThreshold = 1000
-    _recordTimeout = None
+    _recordTimeout = 1
     _phraseTimeout = 1
     _defaultMicrophone = 'pulse'
     _tempFile = ''
-    _ambientNoiseAdjustment = 2 # How many seconds to adjust for noise on start
+    _ambientNoiseAdjustment = 5 # How many seconds to adjust for noise on start
     _activeRecording = False
+    _activeTranscribing = False
     transcription = ['']
     
     _phraseTime = None      # The last time a recording was retreived from the queue.
@@ -53,8 +59,8 @@ class WhisperRT:
         self._tempFile = NamedTemporaryFile().name;
         
         # Adjust microphone to ambient noise
-        with self._Source:
-            self._Recorder.adjust_for_ambient_noise(self._Source, self._ambientNoiseAdjustment)
+        # with self._Source:
+        #     self._Recorder.adjust_for_ambient_noise(self._Source, self._ambientNoiseAdjustment)
 
          # Cue the user that we're ready to go.
         print("\n\nModel loaded.\n\n")
@@ -87,27 +93,60 @@ class WhisperRT:
         # Grab the raw bytes and push it into the thread safe queue.
         data = audio.get_raw_data()
         self._Queue.put(data)
+        print('record callback into data')
+        
+    
+    def _manualMicEnergyLevel(self):
+        time_start = datetime.utcnow()
+        levels = []
+        while self._activeRecording:
+            if not self._Queue.empty():
+                # Concat Queue
+                while not self._Queue.empty():
+                    data = self._Queue.get()
+                    self._lastSample += data
+                    
+                # Use AudioData to convert the raw data to wav data.
+                audio_data = sr.AudioData(self._lastSample, 
+                                          self._Source.SAMPLE_RATE, 
+                                          self._Source.SAMPLE_WIDTH)
+                wav_data = io.BytesIO(audio_data.get_wav_data())
+                
+                # Write wav data to the temporary file as bytes.
+                # Would love to avoid this step though
+                with open(self._tempFile, 'w+b') as f:
+                    f.write(wav_data.read())
+                    
+                # load audio (with shape (samples, channels))
+                data, rate = sf.read(self._tempFile) 
+                # create BS.1770 meter
+                meter = pyln.Meter(rate) 
+                # measure loudness
+                loudness = meter.integrated_loudness(data) 
+                levels.append(loudness)
+                print(loudness)
+                if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
+                    print('Time exceeded')
+                    print(f'Average ambience: {np.mean(levels)}')
+                    self._ambientNoiseAdjustment = np.mean(levels)
+                    self._recordThread()
+                    
+            sleep(0.1)
 
     def _recordThread(self):
+        bStartRecord =  False
         while self._activeRecording:
+            print('record thread')
             try:
-                now = datetime.utcnow()
                 # Pull raw recorded audio from the queue.
                 if not self._Queue.empty():
-                    # If enough time has passed between recordings, consider the phrase complete.
-                    # Clear the current working audio buffer to start over with the new data.
-                    if self._phraseTime and now - self._phraseTime > timedelta(seconds=self._phraseTimeout):
-                        self._lastSample = bytes()
-                    # This is the last time we received new audio data from the queue.
-                    self._phraseTime = now
-           
                     # Concatenate our current audio data with the latest audio data.
+                    databytes = bytes()
                     while not self._Queue.empty():
-                        data = self._Queue.get()
-                        self._lastSample += data
+                        databytes = databytes + self._Queue.get()
            
                     # Use AudioData to convert the raw data to wav data.
-                    audio_data = sr.AudioData(self._lastSample, 
+                    audio_data = sr.AudioData(databytes, 
                                               self._Source.SAMPLE_RATE, 
                                               self._Source.SAMPLE_WIDTH)
                     wav_data = io.BytesIO(audio_data.get_wav_data())
@@ -116,40 +155,71 @@ class WhisperRT:
                     with open(self._tempFile, 'w+b') as f:
                         f.write(wav_data.read())
            
-                    # Read the transcription.
-                    result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
-                    text = result['text'].strip()
-           
-                    # Send to parent (if exists) current transcription
-                    try:
-                        self._parent.getTranscription(text)
-                    except:
-                        print("Unable to send parent transcription. "
-                              "Likely WhisperRT uninitilized with parent or "
-                              "Parent does not have a 'getTranscription' function.")
-                    print(text)
-                    sleep(0.1)
+                    data, rate = sf.read(self._tempFile) # load audio (with shape (samples, channels))
+                    meter = pyln.Meter(rate) # create BS.1770 meter
+                    loudness = meter.integrated_loudness(data) # measure loudness
+                    print(loudness)
+                    
+                    # Check if current audio is louder than ambience:
+                    if loudness >= self._ambientNoiseAdjustment + 1:
+                        bStartRecord = True
+                        print('Actively Recording')
+                        self._lastSample += databytes
+                    elif bStartRecord:
+                        # Read the transcription.
+                        # Use AudioData to convert the raw data to wav data.
+                        audio_data = sr.AudioData(self._lastSample, 
+                                                  self._Source.SAMPLE_RATE, 
+                                                  self._Source.SAMPLE_WIDTH)
+                        wav_data = io.BytesIO(audio_data.get_wav_data())
+               
+                        # Write wav data to the temporary file as bytes.
+                        with open(self._tempFile, 'w+b') as f:
+                            f.write(wav_data.read())
+                            
+                        result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
+                        text = result['text'].strip()
+               
+                        # Send to parent (if exists) current transcription
+                        try:
+                            self._parent.getTranscription(text)
+                        except:
+                            print("Unable to send parent transcription. "
+                                  "Likely WhisperRT uninitilized with parent or "
+                                  "Parent does not have a 'getTranscription' function.")
+                        print(text)
+                        self._lastSample = bytes()
                     
             except :
                 print('Main record thread failed. Something ugly happened')
                 break
+        
+            
+            sleep(0.1)
                
         print("Recording thread terminated")
     
     def startRecording(self):
         self._activeRecording = True
+        self._activeTranscribing = False
         # Create a background thread that will pass us raw audio bytes.
         # We could do this manually but SpeechRecognizer provides a nice helper.
         self._stopListeningFunction = self._Recorder.listen_in_background(self._Source, 
                                             self._record_callback, 
                                             phrase_time_limit=self._recordTimeout)
+        
+        # Reset energy threshold for manual detection
+        # We will start transcription thread in the manual audio level fn
+        self._energyThreshold = 0
         self.transcription = ['']
-        recordThread = threading.Thread(target=self._recordThread)
+        recordThread = threading.Thread(target=self._manualMicEnergyLevel)
         recordThread.start()
+
 
     def stopRecording(self):
         self._stopListeningFunction(wait_for_stop=False)
         self._activeRecording = False
+        self._activeTranscribing = False
    
 
    
