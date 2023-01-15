@@ -165,12 +165,16 @@ class WhisperRT:
                         bStartRecord = True
                         print('Actively Recording')
                         self._lastSample += databytes
+                    # Previously recording, but now audio is back to ambience
                     elif bStartRecord:
+                        bStartRecord = False
                         # Read the transcription.
                         # Use AudioData to convert the raw data to wav data.
                         audio_data = sr.AudioData(self._lastSample, 
                                                   self._Source.SAMPLE_RATE, 
                                                   self._Source.SAMPLE_WIDTH)
+                        
+                        self._lastSample = bytes()
                         wav_data = io.BytesIO(audio_data.get_wav_data())
                
                         # Write wav data to the temporary file as bytes.
@@ -188,7 +192,6 @@ class WhisperRT:
                                   "Likely WhisperRT uninitilized with parent or "
                                   "Parent does not have a 'getTranscription' function.")
                         print(text)
-                        self._lastSample = bytes()
                     
             except :
                 print('Main record thread failed. Something ugly happened')
