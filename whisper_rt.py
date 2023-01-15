@@ -22,7 +22,6 @@ from queue import Queue
 from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
-from multiprocessing import Pipe
 
 
 class WhisperRT:
@@ -30,7 +29,7 @@ class WhisperRT:
     _modelName = 'base.en'
     _nonEnglish = False
     _energyThreshold = 1000
-    _recordTimeout = 2
+    _recordTimeout = None
     _phraseTimeout = 0.5
     _defaultMicrophone = 'pulse'
     _tempFile = ''
@@ -44,6 +43,7 @@ class WhisperRT:
     _Recorder = ''
     _Source = ''
     _Model = ''
+    _stopListeningFunction = ''
     
     ModelReady = False
     
@@ -57,11 +57,7 @@ class WhisperRT:
         with self._Source:
             self._Recorder.adjust_for_ambient_noise(self._Source, self._ambientNoiseAdjustment)
             
-        # Create a background thread that will pass us raw audio bytes.
-        # We could do this manually but SpeechRecognizer provides a nice helper.
-        self._Recorder.listen_in_background(self._Source, 
-                                            self._record_callback, 
-                                            phrase_time_limit=self._recordTimeout)
+        
          # Cue the user that we're ready to go.
         print("Model loaded. Listening in background\n")
         self.ModelReady = True
@@ -91,10 +87,9 @@ class WhisperRT:
         audio: An AudioData containing the recorded bytes.
         """
         # Grab the raw bytes and push it into the thread safe queue.
-        if self._activeRecording:
-            data = audio.get_raw_data()
-            self._Queue.put(data)
-    
+        data = audio.get_raw_data()
+        self._Queue.put(data)
+
     def _recordThread(self):
         while self._activeRecording:
             try:
@@ -156,12 +151,18 @@ class WhisperRT:
     
     def startRecording(self):
         self._activeRecording = True
+        # Create a background thread that will pass us raw audio bytes.
+        # We could do this manually but SpeechRecognizer provides a nice helper.
+        self._stopListeningFunction = self._Recorder.listen_in_background(self._Source, 
+                                            self._record_callback, 
+                                            phrase_time_limit=self._recordTimeout)
         self.transcription = ['']
         os.system('cls' if os.name=='nt' else 'clear')
         recordThread = threading.Thread(target=self._recordThread)
         recordThread.start()
 
     def stopRecording(self):
+        self._stopListeningFunction(wait_for_stop=False)
         self._activeRecording = False
     
     def getTranscription(self):
