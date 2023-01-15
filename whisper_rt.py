@@ -16,6 +16,7 @@ import speech_recognition as sr
 import whisper
 import torch
 import threading
+from curtsies import Input
 
 from datetime import datetime, timedelta
 from queue import Queue
@@ -101,7 +102,7 @@ class WhisperRT:
                     # If enough time has passed between recordings, consider the phrase complete.
                     # Clear the current working audio buffer to start over with the new data.
                     if self._phraseTime and now - self._phraseTime > timedelta(seconds=self._phraseTimeout):
-                        last_sample = bytes()
+                        self._lastSample = bytes()
                         phrase_complete = True
                     # This is the last time we received new audio data from the queue.
                     self._phraseTime = now
@@ -148,6 +149,7 @@ class WhisperRT:
     
     def startRecording(self):
         self._activeRecording = True
+        os.system('cls' if os.name=='nt' else 'clear')
         recordThread = threading.Thread(target=self._recordThread)
         recordThread.start()
 
@@ -164,13 +166,22 @@ w.startRecording()
 
 # For debug
 while True:
-    try:
-        sleep(0.25)
-    except KeyboardInterrupt:
-        break
+    with Input(keynames='curses') as input_generator:
+        for e in input_generator:
+            if e == 'a':
+                print('stiop')
+                w.stopRecording()
+    sleep(0.25)
+    # try:
+    #     if keyboard.is_pressed("a"):
+    #         print('a')
+    #     sleep(0.25)
+    # except KeyboardInterrupt:
+    #     break
                
     
 
+w.stopRecording()
    
 
    
