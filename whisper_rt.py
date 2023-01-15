@@ -139,16 +139,17 @@ class WhisperRT:
                         print(line)
                     # Flush stdout.
                     print('', end='', flush=True)
-           
-                    # Infinite loops are bad for processors, must sleep.
                     sleep(0.1)
-            except KeyboardInterrupt:
+                    
+            except :
+                print('Something Ugly Hasppened')
                 break
                
         print("Recording thread terminated")
     
     def startRecording(self):
         self._activeRecording = True
+        self.transcription = ['']
         os.system('cls' if os.name=='nt' else 'clear')
         recordThread = threading.Thread(target=self._recordThread)
         recordThread.start()
@@ -156,32 +157,6 @@ class WhisperRT:
     def stopRecording(self):
         self._activeRecording = False
     
-    # transcription = ['']
-    
-
-
-w = WhisperRT()
-w.startRecording()
-
-
-# For debug
-while True:
-    with Input(keynames='curses') as input_generator:
-        for e in input_generator:
-            if e == 'a':
-                print('stiop')
-                w.stopRecording()
-    sleep(0.25)
-    # try:
-    #     if keyboard.is_pressed("a"):
-    #         print('a')
-    #     sleep(0.25)
-    # except KeyboardInterrupt:
-    #     break
-               
-    
-
-w.stopRecording()
    
 
    
