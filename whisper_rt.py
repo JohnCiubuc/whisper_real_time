@@ -37,7 +37,7 @@ class WhisperRT:
     _phraseTimeout = 1
     _defaultMicrophone = 'pulse'
     _tempFile = ''
-    _ambientNoiseAdjustment = 5 # How many seconds to adjust for noise on start
+    _ambientNoiseAdjustment = 10 # How many seconds to adjust for noise on start
     _activeRecording = False
     _activeTranscribing = False
     transcription = ['']
@@ -102,12 +102,12 @@ class WhisperRT:
         while self._activeRecording:
             if not self._Queue.empty():
                 # Concat Queue
+                databytes = bytes()
                 while not self._Queue.empty():
-                    data = self._Queue.get()
-                    self._lastSample += data
+                    databytes = databytes + self._Queue.get()
                     
                 # Use AudioData to convert the raw data to wav data.
-                audio_data = sr.AudioData(self._lastSample, 
+                audio_data = sr.AudioData(databytes, 
                                           self._Source.SAMPLE_RATE, 
                                           self._Source.SAMPLE_WIDTH)
                
@@ -121,7 +121,7 @@ class WhisperRT:
                 if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
                     print('Time exceeded')
                     print(f'Average ambience: {np.mean(levels)}')
-                    self._ambientNoiseAdjustment = np.mean(levels)
+                    self._energyThreshold = np.mean(levels)
                     self._recordThread()
                     
             sleep(0.1)
@@ -148,12 +148,12 @@ class WhisperRT:
                     print(loudness)
                     
                     # Check if current audio is louder than ambience:
-                    if loudness >= self._ambientNoiseAdjustment + 2:
+                    if loudness >= self._energyThreshold + 7:
                         bStartRecord = True
                         print('Actively Recording')
                         self._lastSample += databytes
                     # Previously recording, but now audio is back to ambience
-                    elif loudness <= self._ambientNoiseAdjustment + 0.5 and bStartRecord:
+                    elif loudness <= self._energyThreshold + 2 and bStartRecord:
                         self._lastSample += databytes
                         bStartRecord = False
                         # Read the transcription.
