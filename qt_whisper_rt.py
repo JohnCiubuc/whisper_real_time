@@ -3,11 +3,10 @@
 """
 Created on Sun Sep  6 17:12:10 2020
 
-@author: inathero
+@author: John Ciubuc
 """
 
-from PyQt5 import QtGui, QtCore, QtWidgets,uic
-from PyQt5.QtWidgets import *
+from PyQt5 import QtWidgets,uic
 from PyQt5.QtCore import pyqtSignal
 import sys
 import threading

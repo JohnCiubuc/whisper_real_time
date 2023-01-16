@@ -12,24 +12,14 @@ import pyaudio
 import math
 import struct
 import wave
-import time
-import os
-import numpy as np
 import threading
 from sys import platform
-
-Threshold = 10
 
 SHORT_NORMALIZE = (1.0/32768.0)
 chunk = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
-swidth = 2
-
-TIMEOUT_LENGTH = 5
-
-f_name_directory = r'/tmp/'
 
 class Recorder:
 
@@ -40,7 +30,7 @@ class Recorder:
     _data = []
     @staticmethod
     def rms(frame):
-        count = len(frame) / swidth
+        count = len(frame) / 2
         format = "%dh" % (count)
         shorts = struct.unpack(format, frame)
 
@@ -77,37 +67,39 @@ class Recorder:
                                       input=True,
                                       output=True,
                                       frames_per_buffer=chunk)
-
-    # def record(self):
-    #     print('Noise detected, recording beginning')
-    #     rec = []
-    #     current = time.time()
-    #     end = time.time() + TIMEOUT_LENGTH
-
-    #     while current <= end:
-
-    #         data = self.stream.read(chunk)
-    #         if self.rms(data) >= Threshold: end = time.time() + TIMEOUT_LENGTH
-
-    #         current = time.time()
-    #         rec.append(data)
-    #     self.write(b''.join(rec))
-
-    # def write(self, recording):
-    #     n_files = len(os.listdir(f_name_directory))
-
-    #     filename = os.path.join(f_name_directory, '{}.wav'.format(n_files))
-
-    #     wf = wave.open(filename, 'wb')
-    #     wf.setnchannels(CHANNELS)
-    #     wf.setsampwidth(self.p.get_sample_size(FORMAT))
-    #     wf.setframerate(RATE)
-    #     wf.writeframes(recording)
-    #     wf.close()
-    #     print('Written to file: {}'.format(filename))
-    #     print('Returning to listening')
-
-
+    def _background_lister(self):
+        while self._listening:
+            input = self.stream.read(chunk)
+            self.last_rms = self.rms(input)
+            if self._recording:
+                self._data.append(input)       
+    def startListen(self):
+        if not self._listening:
+            self._listening=True
+            threading.Thread(target=self._background_lister).start()  
+    def stopListen(self):
+        self._listening=False    
+    def isListening(self):
+        return self._listening
+    def startRecord(self):
+        if not self._recording:
+            self._data=[]
+            self._recording=True
+    def stopRecord(self):
+        self._recording=False
+        self._full_data = b''.join(self._data)
+    def isRecording(self):
+        return self._recording
+    def restartRecording(self):
+        self._data = []
+        self._full_data =[]
+    def getRecordSnapshot(self):
+        print('later') 
+    def getRMS(self):
+        return self.last_rms
+    def getRecordData(self):
+        return self._full_data
+    
     def saveDataToFile(self, file):
         wf = wave.open(file, 'wb')
         wf.setnchannels(CHANNELS)
@@ -115,37 +107,3 @@ class Recorder:
         wf.setframerate(RATE)
         wf.writeframes(self._full_data)
         wf.close()
-    def _background_lister(self):
-        while self._listening:
-            input = self.stream.read(chunk)
-            self.last_rms = self.rms(input)
-            if self._recording:
-                self._data.append(input)
-            
-    def startListen(self):
-        if not self._listening:
-            self._listening=True
-            threading.Thread(target=self._background_lister).start()
-        
-    def stopListen(self):
-        self._listening=False
-        
-    def startRecord(self):
-        if not self._recording:
-            self._data=[]
-            self._recording=True
-    
-    def getRecordSnapshot(self):
-        print('later')
-        
-    def stopRecord(self):
-        self._recording=False
-        self._full_data = b''.join(self._data)
-    def getRMS(self):
-        return self.last_rms
-    def getRecordData(self):
-        return self._full_data
-    def isListening(self):
-        return self._listening
-    def isRecording(self):
-        return self._recording
