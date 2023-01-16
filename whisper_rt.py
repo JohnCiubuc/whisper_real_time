@@ -37,7 +37,7 @@ class WhisperRT:
     _phraseTimeout = 1
     _defaultMicrophone = 'pulse'
     _tempFile = ''
-    _ambientNoiseAdjustment = 10 # How many seconds to adjust for noise on start
+    # _ambientNoiseAdjustment = 10 # How many seconds to adjust for noise on start
     _activeRecording = False
     _activeTranscribing = False
     transcription = ['']
@@ -117,12 +117,13 @@ class WhisperRT:
                 # measure loudness
                 loudness = meter.integrated_loudness(data) 
                 levels.append(loudness)
-                print(loudness)
-                if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
-                    print('Time exceeded')
-                    print(f'Average ambience: {np.mean(levels)}')
-                    self._energyThreshold = np.mean(levels)
-                    self._recordThread()
+                print(f'{loudness} - {np.var(loudness)})')
+            
+                # if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
+                #     print('Time exceeded')
+                #     print(f'Average ambience: {np.mean(levels)}')
+                #     self._energyThreshold = np.mean(levels)
+                #     self._recordThread()
                     
             sleep(0.1)
 

@@ -68,12 +68,14 @@ class Ui(QtWidgets.QMainWindow):
             return
         self._bButtonActive = not self._bButtonActive
         if self._bButtonActive:
+            self.label_trans.setText('Listening To Mic Ambience')
             self.pushButton.setText('End Transcription')
             tr = threading.Thread(target=self._monitorTranscription)
             tr.start()
             self.Whisper.startRecording()
         else:
             self.pushButton.setText('Start Transcription')
+            self.label_trans.setText('Start Transcription First')
             self.Whisper.stopRecording()
         
     def closeEvent(self, event):
