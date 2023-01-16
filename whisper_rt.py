@@ -133,15 +133,17 @@ class WhisperRT:
                             self._ambience = np.mean(var_levels)
                             print('Ambience variance acceptable')
                             print(f'Average ambience: {self._ambience}')
-                            levels_to_record = 10
+                            
                 #  Actual Recorder
                 else:
                     # Start Recording
                     if average_rms > self._ambience + 2*self._variance:
                         self.Recorder.startRecord()
+                        levels_to_record = 2
                         print('Recording')
                     # Stop Recording:
-                    elif self.Recorder.isRecording():
+                    elif self.Recorder.isRecording() and average_rms < self._ambience + self._variance/2:
+                        levels_to_record = 3
                         self.Recorder.stopRecord()
                         data = self.Recorder.getRecordData()
                         print('Stop Recording')
