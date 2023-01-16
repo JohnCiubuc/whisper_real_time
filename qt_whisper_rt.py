@@ -21,6 +21,10 @@ class Ui(QtWidgets.QMainWindow):
     _transcription = ''
     _fromTranscription = ''
     updateText = pyqtSignal()
+    updateTextEdit = pyqtSignal()
+    variance = ''
+    varianceText=''
+    micLabel = ''
 
     def __init__(self):
         super(Ui, self).__init__() # Call the inherited classes __init__ method
@@ -31,51 +35,51 @@ class Ui(QtWidgets.QMainWindow):
         tr = threading.Thread(target=self._initWhisper)
         tr.start()
         self.updateText.connect(self._asyncUpdateGUI)
+        self.updateTextEdit.connect(self._asyncUpdateGUITextedit)
         
     def _initWhisper(self):
         self.Whisper = whisper_rt.WhisperRT(self)
       
     def doubleSpinBox_PTChanged(self,value):
-        print(value)
-        self.Whisper._phraseTimeout =   value
+        self.Whisper.varianceThreshold = value
               
     # Saves transcription. Called from WhisperRT
     # writes transcription into text
     # Saved transcription used in a GUI thread later
     def getTranscription(self,texts):
-        self._fromTranscription = texts+' '
+        self._transcription = texts+' '
         if self.checkBox_SK.isChecked():
-            pyautogui.write(self._fromTranscription, interval=0.01)
+            pyautogui.write(self._transcription, interval=0.01)
+        self.updateTextEdit.emit()
         
     # Updates GUI with transcription from thread    
-    def _asyncUpdateGUI(self):
+    def _asyncUpdateGUITextedit(self):
         self.plainTextEdit.setPlainText(self.plainTextEdit.toPlainText() + self._transcription)
     
-    # Thread to detect if we have new transcription text that's different
-    # If so, update main thread with new text
-    def _monitorTranscription(self):
-        while self._bButtonActive:
-            if self._fromTranscription != self._transcription:
-                # print('new text')
-                self._transcription = self._fromTranscription
-                self.updateText.emit()
-            sleep(0.2)
+    def _asyncUpdateGUI(self):
+        self.label_trans_val.setText(self.variance)
+        self.label_trans.setText(self.varianceText)
+        self.label_mic.setText(self.micLabel)
         
+    def triggerGUIUpdate(self):
+        self.updateText.emit()
+
     # Start/Stop Transcription
     def buttonClicked(self):
         if not self.Whisper.ModelReady:
             return
         self._bButtonActive = not self._bButtonActive
         if self._bButtonActive:
-            self.label_trans.setText('Listening To Mic Ambience')
             self.pushButton.setText('End Transcription')
-            tr = threading.Thread(target=self._monitorTranscription)
-            tr.start()
             self.Whisper.startRecording()
         else:
+            self.variance = ''
+            self.varianceText=''
+            self.micLabel = ''
             self.pushButton.setText('Start Transcription')
             self.label_trans.setText('Start Transcription First')
             self.Whisper.stopRecording()
+            self.triggerGUIUpdate()
         
     def closeEvent(self, event):
       self.Whisper.stopRecording()

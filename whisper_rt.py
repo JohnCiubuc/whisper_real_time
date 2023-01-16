@@ -34,7 +34,7 @@ class WhisperRT:
     
     ModelReady = False
     
-    
+    varianceThreshold = 25
     _ambience = 0
     _variance = 0
     _activeRecord = False
@@ -65,18 +65,26 @@ class WhisperRT:
                 # Initial Run. Setup Variance.
                 if self._ambience == 0:
                     var_levels.append(average_rms)
+                    self._parent.micLabel = 'Listening'
+                    self._parent.varianceText='Monitoring Room Ambience. \nIf this takes too long, \nconsider increasing variance threshold'
+                    self._parent.variance = f'RMS: {average_rms:.2f} -- VAR: {np.var(var_levels):.2f}'
+                    self._parent.triggerGUIUpdate()
                     #  Get variance from at least 5 RMS's
                     if len(var_levels) > 5:
                         self._variance = np.var(var_levels)
                         print(f'Variance = {self._variance}')
                         # If excessive variance, restart recording
-                        if self._variance > 40:
+                        if self._variance > self.varianceThreshold + 10:
                             var_levels = []
                         # If consistent variance, save ambience, start recording
-                        elif self._variance < 25:
+                        elif self._variance < self.varianceThreshold:
                             self._ambience = np.mean(var_levels)
                             print('Ambience variance acceptable')
                             print(f'Average ambience: {self._ambience}')
+                            
+                            self._parent.variance = f'Average RMS: {self._ambience:.2f}\nAverage Variance: {self._variance:.2f}'
+                            self._parent.varianceText='Ambience variance acceptable'
+                            self._parent.triggerGUIUpdate()
                             levels_to_record = 5 # Half a second
                             
                 #  Actual Recorder
@@ -87,10 +95,13 @@ class WhisperRT:
                     # understanding of intent
                     self.Recorder.startRecord()
                     
+                    
                     if average_rms > self._ambience + 2*self._variance:
                         self._activeRecord = True
-                        levels_to_record = 2
+                        levels_to_record = 3
                         print('Recording')
+                        self._parent.micLabel = 'Recording'
+                        self._parent.triggerGUIUpdate()
                     # Stop Recording:
                     elif self._activeRecord and average_rms < self._ambience + self._variance/2:
                         levels_to_record = 5
@@ -98,7 +109,8 @@ class WhisperRT:
                         self.Recorder.stopRecord()
                         data = self.Recorder.getRecordData()
                         print('Stop Recording')
-                        print(len(data))
+                        self._parent.micLabel = 'Transcribing...'
+                        self._parent.triggerGUIUpdate()
                         self.Recorder.saveDataToFile(self._tempFile)
                             
                         result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
@@ -112,7 +124,12 @@ class WhisperRT:
                                   "Likely WhisperRT uninitilized with parent or "
                                   "Parent does not have a 'getTranscription' function.")
                         print(text)
+                        
+                        self._parent.micLabel = 'Listening'
+                        self._parent.triggerGUIUpdate()
                     elif not self._activeRecord:
+                        self._parent.micLabel = 'Listening'
+                        self._parent.triggerGUIUpdate()
                         self.Recorder.restartRecording()
                 levels = []    
             sleep(0.1)
