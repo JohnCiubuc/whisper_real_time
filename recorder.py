@@ -33,7 +33,7 @@ f_name_directory = r'/tmp/'
 
 class Recorder:
 
-    last_rms = ''
+    last_rms = 0
     
     _listening = False
     _recording = False
@@ -52,15 +52,31 @@ class Recorder:
 
         return rms * 1000
 
-    def __init__(self, device_index):
+    def __init__(self):
         self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(format=FORMAT,
-                                  channels=CHANNELS,
-                                  rate=RATE,
-                                  input=True,
-                                  output=True,
-                                  frames_per_buffer=chunk,
-                                  input_device_index=device_index)
+        info = self.p.get_host_api_info_by_index(0)
+        numdevices = info.get('deviceCount')
+        index = 0
+        if 'linux' in platform:
+            for i in range(0, numdevices):
+                if (self.p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+                    if 'pulse' in  self.p.get_device_info_by_host_api_device_index(0, i).get('name'):
+                        index = i
+                        break
+            self.stream = self.p.open(format=FORMAT,
+                                      channels=CHANNELS,
+                                      rate=RATE,
+                                      input=True,
+                                      output=True,
+                                      frames_per_buffer=chunk,
+                                      input_device_index=index)
+        else:
+            self.stream = self.p.open(format=FORMAT,
+                                      channels=CHANNELS,
+                                      rate=RATE,
+                                      input=True,
+                                      output=True,
+                                      frames_per_buffer=chunk)
 
     # def record(self):
     #     print('Noise detected, recording beginning')
@@ -116,17 +132,5 @@ class Recorder:
     def stopRecord(self):
         self._recording=False
         self._full_data = b''.join(self._data)
-
-
-p = pyaudio.PyAudio()
-info = p.get_host_api_info_by_index(0)
-numdevices = info.get('deviceCount')
-index = 0
-if 'linux' in platform:
-    for i in range(0, numdevices):
-        if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
-            if 'pulse' in  p.get_device_info_by_host_api_device_index(0, i).get('name'):
-                index = i
-                break
-# a = Recorder(index)
-# a.listen()
+    def getRMS(self):
+        return self.last_rms

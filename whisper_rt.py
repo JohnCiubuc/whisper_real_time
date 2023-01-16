@@ -50,14 +50,20 @@ class WhisperRT:
     _Source = ''
     _Model = ''
     _stopListeningFunction = ''
+    Recorder = ''
     
     ModelReady = False
     
+    
+    _ambience = 0
+    
     def __init__(self, parent):
         self._parent = parent
-        self._setupRecognizer()
+        # self._setupRecognizer()
         self._Model = whisper.load_model(self._modelName)
         self._tempFile = NamedTemporaryFile().name;
+        
+        self.Recorder = Rec.Recorder()
         
         # Adjust microphone to ambient noise
         # with self._Source:
@@ -98,33 +104,57 @@ class WhisperRT:
         
     
     def _manualMicEnergyLevel(self):
+        self.Recorder.startListen()
         time_start = datetime.utcnow()
         levels = []
+        var_levels = []
         while self._activeRecording:
-            if not self._Queue.empty():
-                # Concat Queue
-                databytes = bytes()
-                while not self._Queue.empty():
-                    databytes = databytes + self._Queue.get()
+            # print(self.Recorder.getRMS())
+            levels.append(self.Recorder.getRMS())
+            # Average rms over past three recordings
+            if len(levels) == 3:
+                average_rms = np.mean(levels)
+                print(average_rms)
+                var_levels.append(average_rms)
+                #  Get variance from at least 5 RMS's
+                if len(var_levels) > 5:
+                    var = np.var(var_levels)
+                    print(f'Variance = {var}')
+                    # If excessive variance, restart recording
+                    if var > 30:
+                        var_levels = []
+                    # If consistent variance, save ambience
+                    elif var < 15:
+                        self._ambience = np.mean(var_levels)
+                        print('Ambience variance acceptable')
+                        print(f'Average ambience: {self._ambience}')
+                        # self._recordThread()
+                        return
+                levels = []
+            # if not self._Queue.empty():
+            #     # Concat Queue
+            #     databytes = bytes()
+            #     while not self._Queue.empty():
+            #         databytes = databytes + self._Queue.get()
                     
-                # Use AudioData to convert the raw data to wav data.
-                audio_data = sr.AudioData(databytes, 
-                                          self._Source.SAMPLE_RATE, 
-                                          self._Source.SAMPLE_WIDTH)
+            #     # Use AudioData to convert the raw data to wav data.
+            #     audio_data = sr.AudioData(databytes, 
+            #                               self._Source.SAMPLE_RATE, 
+            #                               self._Source.SAMPLE_WIDTH)
                
-                data, rate =  sf.read(io.BytesIO(audio_data.get_wav_data()), dtype='float32') 
-                # create BS.1770 meter
-                meter = pyln.Meter(rate) 
-                # measure loudness
-                loudness = meter.integrated_loudness(data) 
-                levels.append(loudness)
-                print(f'{loudness} - {np.var(loudness)})')
+            #     data, rate =  sf.read(io.BytesIO(audio_data.get_wav_data()), dtype='float32') 
+            #     # create BS.1770 meter
+            #     meter = pyln.Meter(rate) 
+            #     # measure loudness
+            #     loudness = meter.integrated_loudness(data) 
+            #     levels.append(loudness)
+            #     print(f'{loudness} - {np.var(loudness)})')
             
-                # if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
-                #     print('Time exceeded')
-                #     print(f'Average ambience: {np.mean(levels)}')
-                #     self._energyThreshold = np.mean(levels)
-                #     self._recordThread()
+            #     # if  datetime.utcnow() - time_start > timedelta(seconds=self._ambientNoiseAdjustment):
+            #     #     print('Time exceeded')
+            #     #     print(f'Average ambience: {np.mean(levels)}')
+            #     #     self._energyThreshold = np.mean(levels)
+            #     #     self._recordThread()
                     
             sleep(0.1)
 
@@ -197,9 +227,10 @@ class WhisperRT:
         self._activeTranscribing = False
         # Create a background thread that will pass us raw audio bytes.
         # We could do this manually but SpeechRecognizer provides a nice helper.
-        self._stopListeningFunction = self._Recorder.listen_in_background(self._Source, 
-                                            self._record_callback, 
-                                            phrase_time_limit=self._recordTimeout)
+        # self._stopListeningFunction = self._Recorder.listen_in_background(self._Source, 
+        #                                     self._record_callback, 
+        #                                     phrase_time_limit=self._recordTimeout)
+        
         
         # Reset energy threshold for manual detection
         # We will start transcription thread in the manual audio level fn
@@ -210,7 +241,9 @@ class WhisperRT:
 
 
     def stopRecording(self):
-        self._stopListeningFunction(wait_for_stop=False)
+        self.Recorder.stopListen()
+        self.Recorder.stopRecord()
+        # self._stopListeningFunction(wait_for_stop=False)
         self._activeRecording = False
         self._activeTranscribing = False
    
