@@ -108,6 +108,13 @@ class Recorder:
     #     print('Returning to listening')
 
 
+    def saveDataToFile(self, file):
+        wf = wave.open(file, 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(self.p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(self._full_data)
+        wf.close()
     def _background_lister(self):
         while self._listening:
             input = self.stream.read(chunk)
@@ -116,15 +123,17 @@ class Recorder:
                 self._data.append(input)
             
     def startListen(self):
-        self._listening=True
-        threading.Thread(target=self._background_lister).start()
+        if not self._listening:
+            self._listening=True
+            threading.Thread(target=self._background_lister).start()
         
     def stopListen(self):
         self._listening=False
         
     def startRecord(self):
-        self._data=[]
-        self._recording=True
+        if not self._recording:
+            self._data=[]
+            self._recording=True
     
     def getRecordSnapshot(self):
         print('later')
@@ -134,3 +143,9 @@ class Recorder:
         self._full_data = b''.join(self._data)
     def getRMS(self):
         return self.last_rms
+    def getRecordData(self):
+        return self._full_data
+    def isListening(self):
+        return self._listening
+    def isRecording(self):
+        return self._recording
