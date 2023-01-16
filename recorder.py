@@ -87,23 +87,18 @@ class Recorder:
             self._recording=True
     def stopRecord(self):
         self._recording=False
-        self._full_data = b''.join(self._data)
     def isRecording(self):
         return self._recording
-    def restartRecording(self):
+    def resetRecording(self):
         self._data = []
         self._full_data =[]
-    def getRecordSnapshot(self):
-        print('later') 
     def getRMS(self):
         return self.last_rms
-    def getRecordData(self):
-        return self._full_data
-    
     def saveDataToFile(self, file):
+        self._full_data = b''.join(self._data)
         wf = wave.open(file, 'wb')
         wf.setnchannels(CHANNELS)
         wf.setsampwidth(self.p.get_sample_size(FORMAT))
         wf.setframerate(RATE)
-        wf.writeframes(self._full_data)
+        wf.writeframes(b''.join(self._data))
         wf.close()

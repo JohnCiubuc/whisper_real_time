@@ -15,6 +15,7 @@ import torch
 import threading
 import numpy as np
 import recorder as Rec
+from queue import Queue
 
 from tempfile import NamedTemporaryFile
 from time import sleep
@@ -39,6 +40,8 @@ class WhisperRT:
     _variance = 0
     _activeRecord = False
     
+    modelThread = threading.Thread()
+    
     def __init__(self, parent):
         self._parent = parent
         self._Model = whisper.load_model(self._modelName)
@@ -49,6 +52,24 @@ class WhisperRT:
          # Cue the user that we're ready to go.
         print("\n\nModel loaded.\n\n")
         self.ModelReady = True
+    
+    def _asyncTranscribe(self):
+        # while len( self.recorderDataQueue)>0:
+                
+            result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
+            text = result['text'].strip()
+       
+            # Send to parent (if exists) current transcription
+            try:
+                self._parent.getTranscription(text)
+            except:
+                print("Unable to send parent transcription. "
+                      "Likely WhisperRT uninitilized with parent or "
+                      "Parent does not have a 'getTranscription' function.")
+            print(text)
+            
+            self._parent.micLabel = 'Listening'
+            self._parent.triggerGUIUpdate()        
         
     def _manualMicEnergyLevel(self):
         self.Recorder.startListen()
@@ -94,8 +115,6 @@ class WhisperRT:
                     # Allows for 'late' detection of speaking, but full
                     # understanding of intent
                     self.Recorder.startRecord()
-                    
-                    
                     if average_rms > self._ambience + 2*self._variance:
                         self._activeRecord = True
                         levels_to_record = 3
@@ -106,31 +125,32 @@ class WhisperRT:
                     elif self._activeRecord and average_rms < self._ambience + self._variance/2:
                         levels_to_record = 5
                         self._activeRecord = False
-                        self.Recorder.stopRecord()
-                        data = self.Recorder.getRecordData()
-                        print('Stop Recording')
+                        
                         self._parent.micLabel = 'Transcribing...'
                         self._parent.triggerGUIUpdate()
-                        self.Recorder.saveDataToFile(self._tempFile)
-                            
-                        result = self._Model.transcribe(self._tempFile, fp16=torch.cuda.is_available())
-                        text = result['text'].strip()
-               
-                        # Send to parent (if exists) current transcription
-                        try:
-                            self._parent.getTranscription(text)
-                        except:
-                            print("Unable to send parent transcription. "
-                                  "Likely WhisperRT uninitilized with parent or "
-                                  "Parent does not have a 'getTranscription' function.")
-                        print(text)
                         
-                        self._parent.micLabel = 'Listening'
-                        self._parent.triggerGUIUpdate()
+                        try:
+                            if not self.modelThread.is_alive():
+                                self.Recorder.stopRecord()
+                                self.Recorder.saveDataToFile(self._tempFile)
+                                self.Recorder.resetRecording()
+                                self.modelThread = threading.Thread(target=self._asyncTranscribe)
+                                self.modelThread.start()
+                            # else its alive but requesting transcription
+                            
+                        # First time calling this so thread variable wasn't setup        
+                        except:
+                            self.Recorder.stopRecord()
+                            self.Recorder.saveDataToFile(self._tempFile)
+                            self.Recorder.resetRecording()
+                            self.modelThread = threading.Thread(target=self._asyncTranscribe)
+                            self.modelThread.start()
+
+                        self.Recorder.resetRecording()
                     elif not self._activeRecord:
                         self._parent.micLabel = 'Listening'
                         self._parent.triggerGUIUpdate()
-                        self.Recorder.restartRecording()
+                        self.Recorder.resetRecording()
                 levels = []    
             sleep(0.1)
 

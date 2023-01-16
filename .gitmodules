@@ -1,0 +1,3 @@
+[submodule "WhisperRTScriptEngine"]
+	path = WhisperRTScriptEngine
+	url = git@github.com:JohnCiubuc/WhisperRTScriptEngine.git
