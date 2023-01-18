@@ -173,3 +173,12 @@ class WhisperRT:
         # self._stopListeningFunction(wait_for_stop=False)
         self._activeRecording = False
         self._activeTranscribing = False
+    def pauseRecording(self):
+        self.Recorder.stopRecord()
+        # self._stopListeningFunction(wait_for_stop=False)
+        self._activeRecording = False
+        self._activeTranscribing = False
+    def resetAmbience(self):
+        self._ambience = 0
+        self._variance = 0
+        

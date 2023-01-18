@@ -14,7 +14,7 @@ import pyautogui
 
 from time import sleep
 import whisper_rt
-# import WhisperRTScriptEngine.whisper_script_engine as WhisperScriptEngine
+import WhisperRTScriptEngine.whisper_script_engine as WhisperScriptEngine
 
 class Ui(QtWidgets.QMainWindow):
     _bButtonActive = False
@@ -32,9 +32,10 @@ class Ui(QtWidgets.QMainWindow):
         super(Ui, self).__init__() # Call the inherited classes __init__ method
         uic.loadUi('qt/interface.ui', self) # Load the .ui file
         
-        # self.ScriptEngine = WhisperScriptEngine.WhisperRT_ScriptEngine()
+        self.ScriptEngine = WhisperScriptEngine.WhisperRT_ScriptEngine()
         
         self.pushButton.clicked.connect(self.buttonClicked)
+        self.pushButton_recalibrate.clicked.connect(self.buttonRecalibrate)
         self.doubleSpinBox_PT.valueChanged.connect(self.doubleSpinBox_PTChanged)
         tr = threading.Thread(target=self._initWhisper)
         tr.start()
@@ -54,7 +55,7 @@ class Ui(QtWidgets.QMainWindow):
         self._transcription = texts+' '
         if self.checkBox_SK.isChecked():
             pyautogui.write(self._transcription, interval=0.01)
-        # self.ScriptEngine.processIntent(self._transcription)
+        self.ScriptEngine.processIntent(self._transcription)
         self.updateTextEdit.emit()
         
     # Updates GUI with transcription from thread    
@@ -79,17 +80,20 @@ class Ui(QtWidgets.QMainWindow):
             return
         self._bButtonActive = not self._bButtonActive
         if self._bButtonActive:
-            self.pushButton.setText('End Transcription')
+            self.pushButton.setText('Pause Transcription')
             self.Whisper.startRecording()
+            self.pushButton_recalibrate.setEnabled(True)
         else:
             self.variance = ''
             self.varianceText=''
             self.micLabel = ''
             self.pushButton.setText('Start Transcription')
             self.label_trans.setText('Start Transcription First')
-            self.Whisper.stopRecording()
+            self.Whisper.pauseRecording()
             self.triggerGUIUpdate()
         
+    def buttonRecalibrate(self):
+        self.Whisper.resetAmbience()
     def closeEvent(self, event):
       self.Whisper.stopRecording()
       event.accept()
