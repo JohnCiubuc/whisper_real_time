@@ -14,12 +14,10 @@ import pyautogui
 
 from time import sleep
 import whisper_rt
-import WhisperRTScriptEngine.whisper_script_engine as WhisperScriptEngine
 
 class Ui(QtWidgets.QMainWindow):
     _bButtonActive = False
     Whisper = ''
-    ScriptEngine = ''
     _transcription = ''
     _fromTranscription = ''
     updateText = pyqtSignal()
@@ -32,7 +30,6 @@ class Ui(QtWidgets.QMainWindow):
         super(Ui, self).__init__() # Call the inherited classes __init__ method
         uic.loadUi('qt/interface.ui', self) # Load the .ui file
         
-        self.ScriptEngine = WhisperScriptEngine.WhisperRT_ScriptEngine()
         
         self.pushButton.clicked.connect(self.buttonClicked)
         self.pushButton_recalibrate.clicked.connect(self.buttonRecalibrate)
@@ -55,7 +52,6 @@ class Ui(QtWidgets.QMainWindow):
         self._transcription = texts+' '
         if self.checkBox_SK.isChecked():
             pyautogui.write(self._transcription, interval=0.01)
-        self.ScriptEngine.processIntent(self._transcription)
         self.updateTextEdit.emit()
         
     # Updates GUI with transcription from thread    
