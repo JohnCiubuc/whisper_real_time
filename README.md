@@ -2,6 +2,13 @@
 
 ![Demo gif](demo.gif)
 
+To see the GUI on linux, you will likely need to export the QPA platform. For example, when running on Wayland, please export as so:
+
+
+```
+export QT_QPA_PLATFORM=wayland python qt_whisper_rt.py
+```
+
 This is a demo of real time speech to text with OpenAI's Whisper model. It works by constantly recording audio in a thread and concatenating the raw bytes over multiple recordings.
 
 To install dependencies simply run
