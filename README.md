@@ -6,8 +6,19 @@ To see the GUI on linux, you will likely need to export the QPA platform. For ex
 
 
 ```
-export QT_QPA_PLATFORM=wayland python qt_whisper_rt.py
+export QT_QPA_PLATFORM=wayland
+python qt_whisper_rt.py
 ```
+
+If encountering a "Can't connect to display :0", consider running
+
+```
+xhost +
+```
+
+prior to running the application.
+
+=====
 
 This is a demo of real time speech to text with OpenAI's Whisper model. It works by constantly recording audio in a thread and concatenating the raw bytes over multiple recordings.
 
